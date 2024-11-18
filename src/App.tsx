@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from './store';
+import { checkAuth } from './store/slices/userSlice';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import SearchFilters from './components/SearchFilters';
@@ -44,10 +45,19 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 const AppRoutes = () => {
+  const dispatch = useDispatch();
   const { loading } = useSelector((state: RootState) => state.user);
 
+  useEffect(() => {
+    dispatch(checkAuth());
+  }, [dispatch]);
+
   if (loading) {
-    return <div>Carregando...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+      </div>
+    );
   }
 
   return (

@@ -11,15 +11,23 @@ const CategoryPlaces = () => {
   const { type } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const { loading, error } = useSelector((state: RootState) => state.places);
   const places = useSelector((state: RootState) => selectPlacesByType(state, type));
-  const loading = useSelector((state: RootState) => state.places.loading);
 
   useEffect(() => {
+    console.log('Iniciando CategoryPlaces...'); // Debug
+    console.log('Tipo:', type); // Debug
     console.log('Buscando lugares...'); // Debug
     dispatch(fetchPlaces());
   }, [dispatch]);
 
+  useEffect(() => {
+    console.log('Places atualizados:', places.length); // Debug
+    console.log('Primeiro place:', places[0]); // Debug
+  }, [places]);
+
   const categoryTitle = useMemo(() => {
+    console.log('Tipo de categoria:', type); // Debug
     switch (type) {
       case 'igreja':
         return 'Igrejas';
@@ -33,6 +41,7 @@ const CategoryPlaces = () => {
   }, [type]);
 
   if (loading) {
+    console.log('Carregando lugares...'); // Debug
     return (
       <div className="container mx-auto px-4 py-16">
         <h1 className="text-3xl font-bold mb-8">{categoryTitle}</h1>
@@ -44,6 +53,7 @@ const CategoryPlaces = () => {
   }
 
   if (!places || places.length === 0) {
+    console.log('Nenhum lugar encontrado'); // Debug
     return (
       <div className="container mx-auto px-4 py-16">
         <h1 className="text-3xl font-bold mb-8">{categoryTitle}</h1>
@@ -61,6 +71,8 @@ const CategoryPlaces = () => {
   }
 
   console.log('Renderizando lugares:', places); // Debug
+  console.log('Lugares encontrados:', places.length); // Debug
+  console.log('Primeiro lugar:', places[0]); // Debug
 
   return (
     <div className="container mx-auto px-4 py-16">
@@ -80,10 +92,17 @@ const CategoryPlaces = () => {
               />
             </div>
             <div className="p-6">
-              <h3 className="text-xl font-semibold mb-2">{place.name}</h3>
+              <h3 className="text-xl font-semibold mb-2">{place.name || 'Sem nome'}</h3>
               <div className="flex items-center text-gray-600 mb-2">
                 <MapPin size={16} className="mr-1 flex-shrink-0" />
-                <span className="truncate">{place.address}</span>
+                <span className="truncate">
+                  {typeof place.address === 'string' 
+                    ? place.address 
+                    : place.address?.street 
+                      ? `${place.address.street}, ${place.address.number} - ${place.address.city}, ${place.address.state}`
+                      : 'Endereço não disponível'
+                  }
+                </span>
               </div>
               {place.hours && (
                 <div className="flex items-center text-gray-600 mb-3">

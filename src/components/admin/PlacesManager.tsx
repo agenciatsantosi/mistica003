@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
-import { addPlace, approveTemple, rejectTemple, fetchPendingTemples, fetchPlaces } from '../../store/slices/placesSlice';
+import { addPlace, approveTemple, rejectTemple, deletePlace, updatePlace, fetchPendingTemples, fetchPlaces, clearPlaces } from '../../store/slices/placesSlice';
 import { 
   Plus, 
   Edit2, 
@@ -12,18 +12,21 @@ import {
   Clock,
   Image as ImageIcon,
   CheckCircle,
-  XCircle
+  XCircle,
+  Church,
+  RefreshCw
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
 import { LazyImage } from '../ui/Image';
 import { toast } from 'react-toastify';
+import { seedTestData, updateExistingPlaces } from '../../lib/firebase';
 
 const PlacesManager = () => {
   const dispatch = useDispatch();
-  const places = useSelector((state: RootState) => state.places.items);
-  const pendingTemples = useSelector((state: RootState) => state.places.pendingTemples || []);
+  const { items: places, pendingTemples, loading } = useSelector((state: RootState) => state.places);
   const { currentUser } = useSelector((state: RootState) => state.user);
+  
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedPlace, setSelectedPlace] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -44,10 +47,53 @@ const PlacesManager = () => {
   });
 
   useEffect(() => {
-    // Carregar tanto os lugares ativos quanto os pendentes
-    dispatch(fetchPlaces());
-    dispatch(fetchPendingTemples());
+    console.log('Iniciando carregamento de lugares...'); // Debug
+    dispatch(clearPlaces());
+    dispatch(fetchPlaces())
+      .unwrap()
+      .then((places) => {
+        console.log('Lugares carregados com sucesso:', places); // Debug
+      })
+      .catch((error) => {
+        console.error('Erro ao carregar lugares:', error); // Debug
+        toast.error('Erro ao carregar lugares');
+      });
+    
+    dispatch(fetchPendingTemples())
+      .unwrap()
+      .then((temples) => {
+        console.log('Templos pendentes carregados:', temples); // Debug
+      })
+      .catch((error) => {
+        console.error('Erro ao carregar templos pendentes:', error); // Debug
+        toast.error('Erro ao carregar templos pendentes');
+      });
   }, [dispatch]);
+
+  const filteredPlaces = useMemo(() => {
+    console.log('Filtrando lugares...', { places, searchTerm, activeTab }); // Debug
+    return places.filter(place => {
+      const matchesSearch = 
+        place.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        place.type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        place.address?.toLowerCase().includes(searchTerm.toLowerCase());
+
+      if (activeTab === 'active') {
+        return matchesSearch && place.status === 'active';
+      } else {
+        return matchesSearch && place.status === 'pending' && place.type === 'templo';
+      }
+    });
+  }, [places, searchTerm, activeTab]);
+
+  const handleAction = async (action: () => Promise<any>) => {
+    try {
+      await action();
+    } catch (error) {
+      console.error('Erro na ação:', error);
+      toast.error('Ocorreu um erro. Por favor, tente novamente.');
+    }
+  };
 
   const handleAddPlace = () => {
     setSelectedPlace(null);
@@ -68,285 +114,269 @@ const PlacesManager = () => {
     setIsModalOpen(true);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    try {
-      if (!formData.name || !formData.category || !formData.address) {
-        toast.error('Preencha todos os campos obrigatórios');
-        return;
-      }
+  const handleEditPlace = (place: any) => {
+    setSelectedPlace(place);
+    setFormData(place);
+    setIsModalOpen(true);
+  };
 
-      const placeData = {
-        ...formData,
-        latitude: Number(formData.latitude) || 0,
-        longitude: Number(formData.longitude) || 0,
-        rating: 0,
-        reviews: 0,
-        createdAt: new Date().toISOString()
-      };
-
-      if (selectedPlace) {
-        // Implementar edição
-        toast.success('Local atualizado com sucesso!');
-      } else {
-        await dispatch(addPlace(placeData));
-        toast.success('Local adicionado com sucesso!');
-      }
-      
-      setIsModalOpen(false);
-    } catch (error) {
-      toast.error('Erro ao salvar local');
+  const handleDeletePlace = async (placeId: string) => {
+    if (window.confirm('Tem certeza que deseja excluir este lugar?')) {
+      await handleAction(async () => {
+        await dispatch(deletePlace(placeId)).unwrap();
+        toast.success('Lugar excluído com sucesso!');
+      });
     }
   };
 
   const handleApproveTemple = async (temple: any) => {
-    if (!currentUser?.isAdmin) {
-      toast.error('Você precisa ser administrador para realizar esta ação');
-      return;
-    }
-
-    try {
-      await dispatch(approveTemple(temple.id));
-      toast.success('Templo aprovado com sucesso!');
-    } catch (error) {
-      toast.error('Erro ao aprovar templo');
+    if (window.confirm('Tem certeza que deseja aprovar este templo?')) {
+      await handleAction(async () => {
+        await dispatch(approveTemple(temple.id)).unwrap();
+        toast.success('Templo aprovado com sucesso!');
+      });
     }
   };
 
   const handleRejectTemple = async (temple: any) => {
-    if (!currentUser?.isAdmin) {
-      toast.error('Você precisa ser administrador para realizar esta ação');
-      return;
-    }
-
     if (window.confirm('Tem certeza que deseja rejeitar este templo?')) {
-      try {
-        await dispatch(rejectTemple(temple.id));
-        toast.success('Templo rejeitado');
-      } catch (error) {
-        toast.error('Erro ao rejeitar templo');
-      }
+      await handleAction(async () => {
+        await dispatch(rejectTemple(temple.id)).unwrap();
+        toast.success('Templo rejeitado com sucesso!');
+      });
     }
   };
 
-  const filteredPlaces = places.filter(place => {
-    const matchesSearch = 
-      place.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      place.type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      place.address?.toLowerCase().includes(searchTerm.toLowerCase());
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    await handleAction(async () => {
+      if (selectedPlace) {
+        await dispatch(updatePlace({ id: selectedPlace.id, ...formData })).unwrap();
+        toast.success('Lugar atualizado com sucesso!');
+      } else {
+        await dispatch(addPlace(formData)).unwrap();
+        toast.success('Lugar adicionado com sucesso!');
+      }
+      setIsModalOpen(false);
+    });
+  };
 
-    if (activeTab === 'active') {
-      return matchesSearch && place.status === 'active';
-    } else {
-      return matchesSearch && place.status === 'pending' && place.type === 'templo';
+  const handleAddTestPlace = async () => {
+    try {
+      const testPlace = {
+        type: 'igreja',
+        name: 'Igreja Nossa Senhora da Glória',
+        images: ['https://images.unsplash.com/photo-1577164213863-69dd2a20cda8'],
+        description: 'Uma bela igreja histórica',
+        address: 'Rua da Igreja, 123',
+        latitude: -23.550520,
+        longitude: -46.633308,
+        status: 'active',
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+
+      const placeRef = await dispatch(addPlace(testPlace));
+      console.log('Lugar de teste adicionado com ID:', placeRef);
+      toast.success('Lugar de teste adicionado com sucesso!');
+      dispatch(fetchPlaces());
+    } catch (error) {
+      console.error('Erro ao adicionar lugar de teste:', error);
+      toast.error('Erro ao adicionar lugar de teste');
     }
-  });
-
-  useEffect(() => {
-    console.log('Places:', places); // Debug
-    console.log('Filtered Places:', filteredPlaces); // Debug
-    console.log('Active Tab:', activeTab); // Debug
-  }, [places, filteredPlaces, activeTab]);
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Gerenciar Lugares</h2>
-        <Button onClick={handleAddPlace} icon={<Plus size={20} />}>
-          Adicionar Lugar
-        </Button>
+        <div className="space-x-4">
+          <Button onClick={handleAddPlace} icon={<Plus size={20} />}>
+            Adicionar Lugar
+          </Button>
+          {process.env.NODE_ENV === 'development' && (
+            <>
+              <Button 
+                onClick={updateExistingPlaces} 
+                variant="secondary"
+                icon={<RefreshCw size={20} />}
+              >
+                Atualizar Lugares Existentes
+              </Button>
+              <Button onClick={seedTestData} variant="secondary">
+                Adicionar Dados de Teste
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex border-b mb-6">
+      <div className="flex space-x-4 mb-4">
         <button
-          onClick={() => setActiveTab('active')}
-          className={`px-4 py-2 font-medium ${
+          className={`px-4 py-2 rounded-lg ${
             activeTab === 'active'
-              ? 'text-rose-500 border-b-2 border-rose-500'
-              : 'text-gray-600 hover:text-gray-900'
+              ? 'bg-primary text-white'
+              : 'bg-gray-100 text-gray-600'
           }`}
+          onClick={() => setActiveTab('active')}
         >
           Lugares Ativos
         </button>
         <button
-          onClick={() => setActiveTab('pending')}
-          className={`px-4 py-2 font-medium ${
+          className={`px-4 py-2 rounded-lg ${
             activeTab === 'pending'
-              ? 'text-rose-500 border-b-2 border-rose-500'
-              : 'text-gray-600 hover:text-gray-900'
+              ? 'bg-primary text-white'
+              : 'bg-gray-100 text-gray-600'
           }`}
+          onClick={() => setActiveTab('pending')}
         >
-          Pendentes de Aprovação {pendingTemples.length > 0 && (
-            <span className="ml-2 px-2 py-1 text-xs bg-rose-100 text-rose-600 rounded-full">
-              {pendingTemples.length}
-            </span>
-          )}
+          Templos Pendentes
         </button>
       </div>
 
-      {/* Search */}
-      <div className="bg-white p-4 rounded-lg shadow-md">
-        <div className="relative">
-          <Search className="absolute left-3 top-3 text-gray-400" size={20} />
-          <input
-            type="search"
-            placeholder="Buscar lugares..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-rose-500"
-          />
-        </div>
+      <div className="relative">
+        <input
+          type="text"
+          placeholder="Buscar lugares..."
+          className="w-full px-4 py-2 border rounded-lg"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+        <Search className="absolute right-3 top-2.5 text-gray-400" size={20} />
       </div>
 
-      {/* Places List */}
-      <div className="bg-white rounded-lg shadow-md">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Local
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Categoria
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Localização
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Ações
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {activeTab === 'active' ? (
+      {loading ? (
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+        </div>
+      ) : (
+        <>
+          {activeTab === 'active' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredPlaces.length > 0 ? (
                 filteredPlaces.map((place) => (
-                  <tr key={place.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="h-10 w-10 flex-shrink-0">
-                          <LazyImage
-                            src={place.image}
-                            alt={place.name}
-                            className="h-10 w-10 rounded-lg object-cover"
-                          />
+                  <div key={place.id} className="bg-white rounded-lg shadow-md p-4">
+                    <div className="flex items-center mb-4">
+                      <div className="h-10 w-10 flex-shrink-0">
+                        <LazyImage
+                          src={place.images?.[0] || place.image || 'https://via.placeholder.com/100'}
+                          alt={place.name || 'Local'}
+                          className="h-10 w-10 rounded-lg object-cover"
+                        />
+                      </div>
+                      <div className="ml-4">
+                        <div className="text-sm font-medium text-gray-900">
+                          {place.name || 'Sem nome'}
                         </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">
-                            {place.name}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {place.type}
-                          </div>
+                        <div className="text-sm text-gray-500">
+                          {place.type || 'Sem tipo'}
                         </div>
                       </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-rose-100 text-rose-800">
-                        {place.category}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {place.location}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                        Ativo
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    </div>
+                    <div className="text-sm text-gray-500 mb-4">
+                      {typeof place.address === 'string' 
+                        ? place.address 
+                        : place.address?.street 
+                          ? `${place.address.street}, ${place.address.number} - ${place.address.city}, ${place.address.state}`
+                          : 'Endereço não disponível'
+                      }
+                    </div>
+                    <div className="flex justify-end space-x-3">
                       <button
-                        onClick={() => {
-                          setSelectedPlace(place);
-                          setFormData(place);
-                          setIsModalOpen(true);
-                        }}
-                        className="text-indigo-600 hover:text-indigo-900 mr-4"
+                        onClick={() => handleEditPlace(place)}
+                        className="text-indigo-600 hover:text-indigo-900"
                       >
                         <Edit2 size={16} />
                       </button>
                       <button
-                        onClick={() => {
-                          if (window.confirm('Tem certeza que deseja excluir este local?')) {
-                            // Implementar exclusão
-                          }
-                        }}
+                        onClick={() => handleDeletePlace(place.id)}
                         className="text-red-600 hover:text-red-900"
                       >
                         <Trash2 size={16} />
                       </button>
-                    </td>
-                  </tr>
+                    </div>
+                  </div>
                 ))
               ) : (
+                <div className="col-span-full flex flex-col items-center justify-center h-64 bg-gray-50 rounded-lg">
+                  <MapPin size={48} className="text-gray-400 mb-4" />
+                  <p className="text-gray-500 text-lg mb-2">Nenhum lugar encontrado</p>
+                  <p className="text-gray-400">
+                    {searchTerm 
+                      ? 'Tente buscar com outros termos'
+                      : 'Clique em "Adicionar Lugar" para começar'}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'pending' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {pendingTemples.length > 0 ? (
                 pendingTemples.map((temple) => (
-                  <tr key={temple.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="h-10 w-10 flex-shrink-0">
-                          <LazyImage
-                            src={temple.image || 'https://via.placeholder.com/100'}
-                            alt={temple.name}
-                            className="h-10 w-10 rounded-lg object-cover"
-                          />
+                  <div key={temple.id} className="bg-white rounded-lg shadow-md p-4">
+                    <div className="flex items-center mb-4">
+                      <div className="h-10 w-10 flex-shrink-0">
+                        <LazyImage
+                          src={temple.images?.[0] || temple.image || 'https://via.placeholder.com/100'}
+                          alt={temple.name || 'Templo'}
+                          className="h-10 w-10 rounded-lg object-cover"
+                        />
+                      </div>
+                      <div className="ml-4">
+                        <div className="text-sm font-medium text-gray-900">
+                          {temple.name || 'Sem nome'}
                         </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">
-                            {temple.name}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {temple.email}
-                          </div>
+                        <div className="text-sm text-gray-500">
+                          {temple.email || 'Email não disponível'}
                         </div>
                       </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-rose-100 text-rose-800">
-                        {temple.category}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {temple.address}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                        Pendente
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    </div>
+                    <div className="text-sm text-gray-500 mb-4">
+                      {typeof temple.address === 'string' 
+                        ? temple.address 
+                        : temple.address?.street 
+                          ? `${temple.address.street}, ${temple.address.number} - ${temple.address.city}, ${temple.address.state}`
+                          : 'Endereço não disponível'
+                      }
+                    </div>
+                    <div className="flex justify-end space-x-3">
                       <button
                         onClick={() => handleApproveTemple(temple)}
-                        className="text-green-600 hover:text-green-900 mr-4"
-                        title="Aprovar"
+                        className="text-green-600 hover:text-green-900"
                       >
                         <CheckCircle size={16} />
                       </button>
                       <button
                         onClick={() => handleRejectTemple(temple)}
                         className="text-red-600 hover:text-red-900"
-                        title="Rejeitar"
                       >
                         <XCircle size={16} />
                       </button>
-                    </td>
-                  </tr>
+                    </div>
+                  </div>
                 ))
+              ) : (
+                <div className="col-span-full flex flex-col items-center justify-center h-64 bg-gray-50 rounded-lg">
+                  <Church size={48} className="text-gray-400 mb-4" />
+                  <p className="text-gray-500 text-lg mb-2">Nenhum templo pendente</p>
+                  <p className="text-gray-400">
+                    Todos os templos foram processados
+                  </p>
+                </div>
               )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+            </div>
+          )}
+        </>
+      )}
 
-      {/* Add/Edit Place Modal */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title={selectedPlace ? 'Editar Local' : 'Adicionar Local'}
+        title={selectedPlace ? 'Editar Lugar' : 'Adicionar Lugar'}
       >
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>

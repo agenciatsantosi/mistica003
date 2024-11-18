@@ -1,6 +1,16 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { 
+  collection, 
+  getDocs, 
+  addDoc, 
+  doc, 
+  updateDoc, 
+  deleteDoc,
+  query, 
+  where,
+  serverTimestamp
+} from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, serverTimestamp, query, where } from 'firebase/firestore';
 import { toast } from 'react-toastify';
 
 interface Place {
@@ -16,7 +26,7 @@ interface Place {
   hours?: string;
   phone?: string;
   email?: string;
-  status: 'active' | 'pending' | 'rejected';
+  status: 'active' | 'pending' | 'rejected' | 'approved';
   createdAt?: any;
   updatedAt?: any;
 }
@@ -35,30 +45,29 @@ const initialState: PlacesState = {
   error: null
 };
 
-// Buscar todos os lugares ativos
+// Buscar lugares
 export const fetchPlaces = createAsyncThunk(
   'places/fetchPlaces',
   async (_, { rejectWithValue }) => {
     try {
-      const q = query(collection(db, 'places'));
+      console.log('Iniciando busca de lugares...'); // Debug
+      const placesRef = collection(db, 'places');
+      const q = query(placesRef, where('status', 'in', ['active', 'approved']));
       const querySnapshot = await getDocs(q);
-      console.log('Lugares encontrados:', querySnapshot.size); // Debug
       
-      const places = querySnapshot.docs.map(doc => {
-        const data = doc.data();
-        console.log('Dados do lugar:', doc.id, data); // Debug
-        return {
-          id: doc.id,
-          ...data,
-          createdAt: data.createdAt?.toDate(),
-          updatedAt: data.updatedAt?.toDate()
-        };
-      }) as Place[];
+      const places = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        createdAt: doc.data().createdAt?.toDate?.() || null,
+        updatedAt: doc.data().updatedAt?.toDate?.() || null
+      }));
+      
+      console.log('Lugares encontrados:', places.length); // Debug
+      console.log('Primeiro lugar:', places[0]); // Debug
       
       return places;
     } catch (error: any) {
-      console.error('Erro ao buscar lugares:', error);
-      toast.error('Erro ao carregar lugares');
+      console.error('Erro ao buscar lugares:', error); // Debug
       return rejectWithValue(error.message);
     }
   }
@@ -69,20 +78,27 @@ export const fetchPendingTemples = createAsyncThunk(
   'places/fetchPendingTemples',
   async (_, { rejectWithValue }) => {
     try {
+      // Primeiro buscar todos os templos pendentes
       const q = query(
         collection(db, 'places'),
         where('status', '==', 'pending'),
         where('type', '==', 'templo')
       );
+      
       const querySnapshot = await getDocs(q);
+      console.log('Templos pendentes encontrados:', querySnapshot.size);
+      
       const temples = querySnapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate(),
-        updatedAt: doc.data().updatedAt?.toDate()
+        ...doc.data()
       })) as Place[];
       
-      return temples;
+      // Ordenar no cliente
+      return temples.sort((a, b) => {
+        const dateA = a.createdAt?.toDate?.() || new Date(0);
+        const dateB = b.createdAt?.toDate?.() || new Date(0);
+        return dateB.getTime() - dateA.getTime();
+      });
     } catch (error: any) {
       console.error('Erro ao buscar templos pendentes:', error);
       toast.error('Erro ao carregar templos pendentes');
@@ -91,31 +107,28 @@ export const fetchPendingTemples = createAsyncThunk(
   }
 );
 
-// Adicionar novo local
+// Adicionar novo lugar
 export const addPlace = createAsyncThunk(
   'places/addPlace',
-  async (placeData: Omit<Place, 'id'>, { rejectWithValue }) => {
+  async (place: Omit<Place, 'id'>, { rejectWithValue }) => {
     try {
-      const dataWithTimestamp = {
-        ...placeData,
-        status: 'active',
+      const placeWithTimestamp = {
+        ...place,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       };
 
-      const docRef = await addDoc(collection(db, 'places'), dataWithTimestamp);
+      const docRef = await addDoc(collection(db, 'places'), placeWithTimestamp);
+      console.log('Lugar adicionado com ID:', docRef.id);
       
-      toast.success('Local adicionado com sucesso!');
-      return { 
-        id: docRef.id, 
-        ...placeData,
-        status: 'active',
+      return {
+        id: docRef.id,
+        ...place,
         createdAt: new Date(),
         updatedAt: new Date()
       };
     } catch (error: any) {
-      console.error('Erro ao adicionar local:', error);
-      toast.error('Erro ao adicionar local');
+      console.error('Erro ao adicionar lugar:', error);
       return rejectWithValue(error.message);
     }
   }
@@ -160,7 +173,7 @@ export const approveTemple = createAsyncThunk(
     try {
       const templeRef = doc(db, 'places', templeId);
       await updateDoc(templeRef, {
-        status: 'active',
+        status: 'approved',
         updatedAt: serverTimestamp()
       });
 
@@ -195,10 +208,59 @@ export const rejectTemple = createAsyncThunk(
   }
 );
 
+// Excluir lugar
+export const deletePlace = createAsyncThunk(
+  'places/deletePlace',
+  async (placeId: string, { rejectWithValue }) => {
+    try {
+      const placeRef = doc(db, 'places', placeId);
+      await deleteDoc(placeRef);
+      console.log('Lugar excluído com ID:', placeId);
+      return placeId;
+    } catch (error: any) {
+      console.error('Erro ao excluir lugar:', error);
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+// Atualizar lugar
+export const updatePlace = createAsyncThunk(
+  'places/updatePlace',
+  async ({ id, ...updates }: { id: string; [key: string]: any }, { rejectWithValue }) => {
+    try {
+      const placeRef = doc(db, 'places', id);
+      const updateData = {
+        ...updates,
+        updatedAt: serverTimestamp()
+      };
+      
+      await updateDoc(placeRef, updateData);
+      console.log('Lugar atualizado com ID:', id);
+      
+      return {
+        id,
+        ...updates,
+        updatedAt: new Date()
+      };
+    } catch (error: any) {
+      console.error('Erro ao atualizar lugar:', error);
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
 const placesSlice = createSlice({
   name: 'places',
   initialState,
-  reducers: {},
+  reducers: {
+    clearPlaces: (state) => {
+      state.items = [];
+      state.pendingTemples = [];
+      state.loading = false;
+      state.error = null;
+    }
+  },
   extraReducers: (builder) => {
     // fetchPlaces
     builder
@@ -209,27 +271,27 @@ const placesSlice = createSlice({
       .addCase(fetchPlaces.fulfilled, (state, action) => {
         state.loading = false;
         state.items = action.payload;
+        console.log('Places atualizados no estado:', state.items.length);
       })
       .addCase(fetchPlaces.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
-      })
+      });
 
     // fetchPendingTemples
-    builder
-      .addCase(fetchPendingTemples.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
-      .addCase(fetchPendingTemples.fulfilled, (state, action) => {
-        state.loading = false;
-        state.pendingTemples = action.payload;
-      })
-      .addCase(fetchPendingTemples.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload as string;
-      })
-    
+    builder.addCase(fetchPendingTemples.pending, (state) => {
+      state.loading = true;
+      state.error = null;
+    });
+    builder.addCase(fetchPendingTemples.fulfilled, (state, action) => {
+      state.loading = false;
+      state.pendingTemples = action.payload;
+    });
+    builder.addCase(fetchPendingTemples.rejected, (state, action) => {
+      state.loading = false;
+      state.error = action.payload as string;
+    });
+
     // addPlace
     builder
       .addCase(addPlace.pending, (state) => {
@@ -238,63 +300,67 @@ const placesSlice = createSlice({
       })
       .addCase(addPlace.fulfilled, (state, action) => {
         state.loading = false;
-        state.items.push(action.payload);
+        state.items.unshift(action.payload as Place);
       })
       .addCase(addPlace.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
-      })
+      });
 
     // addTemple
-    builder
-      .addCase(addTemple.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
-      .addCase(addTemple.fulfilled, (state, action) => {
-        state.loading = false;
-        state.pendingTemples.push(action.payload);
-      })
-      .addCase(addTemple.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload as string;
-      })
+    builder.addCase(addTemple.fulfilled, (state, action) => {
+      state.pendingTemples.unshift(action.payload);
+    });
 
     // approveTemple
-    builder
-      .addCase(approveTemple.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
-      .addCase(approveTemple.fulfilled, (state, action) => {
-        state.loading = false;
-        const temple = state.pendingTemples.find(t => t.id === action.payload);
-        if (temple) {
-          state.items.push({ ...temple, status: 'active' });
-          state.pendingTemples = state.pendingTemples.filter(t => t.id !== action.payload);
-        }
-      })
-      .addCase(approveTemple.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload as string;
-      })
+    builder.addCase(approveTemple.fulfilled, (state, action) => {
+      const temple = state.pendingTemples.find(t => t.id === action.payload);
+      if (temple) {
+        temple.status = 'approved';
+        state.items.unshift(temple);
+        state.pendingTemples = state.pendingTemples.filter(t => t.id !== action.payload);
+      }
+    });
 
     // rejectTemple
+    builder.addCase(rejectTemple.fulfilled, (state, action) => {
+      state.pendingTemples = state.pendingTemples.filter(t => t.id !== action.payload);
+    });
+
+    // deletePlace
     builder
-      .addCase(rejectTemple.pending, (state) => {
+      .addCase(deletePlace.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
-      .addCase(rejectTemple.fulfilled, (state, action) => {
+      .addCase(deletePlace.fulfilled, (state, action) => {
         state.loading = false;
-        state.pendingTemples = state.pendingTemples.filter(t => t.id !== action.payload);
+        state.items = state.items.filter(place => place.id !== action.payload);
       })
-      .addCase(rejectTemple.rejected, (state, action) => {
+      .addCase(deletePlace.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      });
+
+    // updatePlace
+    builder
+      .addCase(updatePlace.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(updatePlace.fulfilled, (state, action) => {
+        state.loading = false;
+        const index = state.items.findIndex(place => place.id === action.payload.id);
+        if (index !== -1) {
+          state.items[index] = action.payload;
+        }
+      })
+      .addCase(updatePlace.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
       });
   }
 });
 
-export const { reducer: placesReducer } = placesSlice;
-export default placesReducer;
+export const { clearPlaces } = placesSlice.actions;
+export default placesSlice.reducer;

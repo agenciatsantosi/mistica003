@@ -6,7 +6,8 @@ import {
   signInWithPopup,
   createUserWithEmailAndPassword,
   updateProfile,
-  User 
+  User,
+  onAuthStateChanged
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { toast } from 'react-toastify';
@@ -34,7 +35,7 @@ interface UserState {
 const initialState: UserState = {
   currentUser: null,
   profile: null,
-  loading: false,
+  loading: true,
   error: null,
 };
 
@@ -226,83 +227,122 @@ export const fetchUserProfile = createAsyncThunk(
   }
 );
 
+// Verificar estado da autenticação
+export const checkAuth = createAsyncThunk(
+  'user/checkAuth',
+  async (_, { rejectWithValue }) => {
+    try {
+      return new Promise((resolve, reject) => {
+        const unsubscribe = onAuthStateChanged(auth, 
+          (user) => {
+            unsubscribe();
+            if (user) {
+              console.log('Usuário autenticado:', user.email);
+              resolve({
+                email: user.email,
+                uid: user.uid,
+                isAdmin: true // TODO: Implementar verificação de admin
+              });
+            } else {
+              console.log('Usuário não autenticado');
+              resolve(null);
+            }
+          },
+          (error) => {
+            console.error('Erro ao verificar autenticação:', error);
+            reject(error);
+          }
+        );
+      });
+    } catch (error: any) {
+      console.error('Erro ao verificar autenticação:', error);
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
 const userSlice = createSlice({
   name: 'user',
   initialState,
   reducers: {
     setUser: (state, action) => {
       state.currentUser = action.payload;
+      state.loading = false;
+      state.error = null;
+      // Log para debug
+      if (action.payload) {
+        console.log('User data after login:', action.payload);
+      }
     },
+    clearError: (state) => {
+      state.error = null;
+    }
   },
   extraReducers: (builder) => {
     builder
-      // Google Sign In
+      // Tratamento de signInWithGoogle
       .addCase(signInWithGoogle.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
       .addCase(signInWithGoogle.fulfilled, (state, action) => {
-        state.loading = false;
         state.currentUser = action.payload;
+        state.loading = false;
         state.error = null;
-        toast.success('Login realizado com sucesso!');
       })
       .addCase(signInWithGoogle.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
-        state.currentUser = null;
+        // Não limpar currentUser em caso de erro
       })
-      // Email Sign In
+      
+      // Tratamento de signIn
       .addCase(signIn.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
       .addCase(signIn.fulfilled, (state, action) => {
-        state.loading = false;
         state.currentUser = action.payload;
+        state.loading = false;
         state.error = null;
-        toast.success('Login realizado com sucesso!');
       })
       .addCase(signIn.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
-        state.currentUser = null;
+        // Não limpar currentUser em caso de erro
       })
-      // Sign Up
-      .addCase(signUp.pending, (state) => {
+      
+      // Tratamento de signOut
+      .addCase(signOut.pending, (state) => {
         state.loading = true;
-        state.error = null;
       })
-      .addCase(signUp.fulfilled, (state, action) => {
-        state.loading = false;
-        state.currentUser = action.payload;
-        state.error = null;
-        toast.success('Conta criada com sucesso!');
-      })
-      .addCase(signUp.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload as string;
-        state.currentUser = null;
-      })
-      // Sign Out
       .addCase(signOut.fulfilled, (state) => {
         state.currentUser = null;
         state.profile = null;
-        toast.success('Logout realizado com sucesso!');
+        state.loading = false;
+        state.error = null;
       })
-      // Update Profile
-      .addCase(updateUserProfile.fulfilled, (state, action) => {
-        if (state.profile) {
-          state.profile = { ...state.profile, ...action.payload };
-        }
-        toast.success('Perfil atualizado com sucesso!');
+      .addCase(signOut.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+        // Não limpar currentUser em caso de erro de logout
       })
-      // Fetch Profile
-      .addCase(fetchUserProfile.fulfilled, (state, action) => {
-        state.profile = action.payload;
+      
+      // Tratamento de checkAuth
+      .addCase(checkAuth.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(checkAuth.fulfilled, (state, action) => {
+        state.loading = false;
+        state.currentUser = action.payload;
+      })
+      .addCase(checkAuth.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
       });
-  },
+  }
 });
 
-export const { setUser } = userSlice.actions;
+export const { setUser, clearError } = userSlice.actions;
 export default userSlice.reducer;
