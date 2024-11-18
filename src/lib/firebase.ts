@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
-import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore';
+import { getFirestore, initializeFirestore, enableIndexedDbPersistence } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { toast } from 'react-toastify';
 
@@ -33,33 +33,45 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
-// Inicializar Firebase
+console.log('Inicializando Firebase...'); // Debug
+
 const app = initializeApp(firebaseConfig);
+console.log('Firebase inicializado com sucesso!'); // Debug
+console.log('Projeto ID:', firebaseConfig.projectId); // Debug
 
 // Inicializar serviços
 const auth = getAuth(app);
 auth.useDeviceLanguage();
-const db = getFirestore(app);
+const db = initializeFirestore(app, {
+  experimentalForceLongPolling: true,
+  cache: {
+    persistenceEnabled: true,
+    persistenceSettings: {
+      synchronizeTabs: true
+    }
+  }
+});
 const storage = getStorage(app);
 const googleProvider = new GoogleAuthProvider();
+
+// Habilitar persistência offline
+enableIndexedDbPersistence(db)
+  .then(() => {
+    console.log('Persistência offline habilitada com sucesso!'); // Debug
+  })
+  .catch((err) => {
+    console.error('Erro ao habilitar persistência:', err); // Debug
+    if (err.code === 'failed-precondition') {
+      console.warn('Múltiplas abas abertas. Persistência disponível em apenas uma aba.');
+    } else if (err.code === 'unimplemented') {
+      console.warn('O navegador não suporta persistência offline.');
+    }
+  });
 
 // Configurar provedor Google
 googleProvider.setCustomParameters({
   prompt: 'select_account'
 });
-
-// Configurar persistência offline
-try {
-  enableIndexedDbPersistence(db).catch((err) => {
-    if (err.code === 'failed-precondition') {
-      console.warn('Múltiplas abas abertas, persistência offline disponível apenas em uma aba.');
-    } else if (err.code === 'unimplemented') {
-      console.warn('O navegador não suporta persistência offline.');
-    }
-  });
-} catch (err) {
-  console.warn('Erro ao configurar persistência offline:', err);
-}
 
 // Monitorar estado da conexão
 if (typeof window !== 'undefined') {

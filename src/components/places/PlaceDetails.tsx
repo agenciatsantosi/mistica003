@@ -29,7 +29,7 @@ const PlaceDetails = () => {
   const galleryImages = [
     {
       id: '1',
-      url: 'https://images.unsplash.com/photo-1545494097-1545e22ee878',
+      url: 'https://images.unsplash.com/photo-1577164213863-69dd2a20cda8',
       description: 'Salão principal durante cerimônia'
     },
     {
@@ -162,7 +162,7 @@ const PlaceDetails = () => {
             </div>
             <ShareButtons
               url={window.location.href}
-              title={`Conheça ${place.name} no Místico`}
+              title={`Conheça ${place.name} no Portal da Fé`}
             />
           </div>
 

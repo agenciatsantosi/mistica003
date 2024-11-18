@@ -20,8 +20,11 @@ const Navbar = () => {
     <nav className="bg-white shadow-sm sticky top-0 z-50">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
-          <Link to="/" className="text-2xl font-bold text-rose-500">
-            Místico
+          <Link to="/" className="flex items-center">
+            <img src="/logo.png" alt="Portal da Fé" className="h-8 w-auto" />
+            <span className="ml-2 text-xl font-semibold text-rose-600">
+              Portal da Fé
+            </span>
           </Link>
           
           <div className="flex items-center space-x-6">

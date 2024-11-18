@@ -3,8 +3,9 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { RootState } from '../../store';
 import { fetchUserProfile, updateUserProfile } from '../../store/slices/userSlice';
-import { User, Settings, Bell, Globe, Moon } from 'lucide-react';
+import { User, Settings, Bell, Globe, Moon, Calendar } from 'lucide-react';
 import { Button } from '../ui/Button';
+import { Link } from 'react-router-dom';
 
 const UserProfile = () => {
   const dispatch = useDispatch();
@@ -151,6 +152,19 @@ const UserProfile = () => {
               </div>
             </div>
           </div>
+
+          <Link
+            to="/perfil/agendamentos"
+            className="flex items-center p-4 bg-white rounded-lg shadow-md hover:bg-gray-50"
+          >
+            <Calendar className="w-6 h-6 text-rose-500 mr-3" />
+            <div>
+              <h3 className="text-lg font-medium text-gray-900">Meus Agendamentos</h3>
+              <p className="text-sm text-gray-500">
+                Visualize e gerencie seus agendamentos
+              </p>
+            </div>
+          </Link>
         </div>
       </div>
     </div>

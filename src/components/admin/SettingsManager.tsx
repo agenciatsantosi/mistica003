@@ -4,7 +4,7 @@ import { Button } from '../ui/Button';
 
 const SettingsManager = () => {
   const [settings, setSettings] = useState({
-    siteName: 'Místico',
+    siteName: 'Portal da Fé',
     siteDescription: 'Plataforma de descoberta de lugares espirituais',
     language: 'pt-BR',
     timezone: 'America/Sao_Paulo',

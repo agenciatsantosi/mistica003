@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
-import { addPlace, approveTemple, rejectTemple } from '../../store/slices/placesSlice';
+import { addPlace, approveTemple, rejectTemple, fetchPendingTemples, fetchPlaces } from '../../store/slices/placesSlice';
 import { 
   Plus, 
   Edit2, 
@@ -42,6 +42,12 @@ const PlacesManager = () => {
     type: 'igreja',
     status: 'active'
   });
+
+  useEffect(() => {
+    // Carregar tanto os lugares ativos quanto os pendentes
+    dispatch(fetchPlaces());
+    dispatch(fetchPendingTemples());
+  }, [dispatch]);
 
   const handleAddPlace = () => {
     setSelectedPlace(null);
@@ -124,11 +130,24 @@ const PlacesManager = () => {
     }
   };
 
-  const filteredPlaces = places.filter(place =>
-    place.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    place.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    place.location.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredPlaces = places.filter(place => {
+    const matchesSearch = 
+      place.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      place.type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      place.address?.toLowerCase().includes(searchTerm.toLowerCase());
+
+    if (activeTab === 'active') {
+      return matchesSearch && place.status === 'active';
+    } else {
+      return matchesSearch && place.status === 'pending' && place.type === 'templo';
+    }
+  });
+
+  useEffect(() => {
+    console.log('Places:', places); // Debug
+    console.log('Filtered Places:', filteredPlaces); // Debug
+    console.log('Active Tab:', activeTab); // Debug
+  }, [places, filteredPlaces, activeTab]);
 
   return (
     <div className="space-y-6">

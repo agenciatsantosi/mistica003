@@ -21,7 +21,7 @@ const FeaturedPlaces = () => {
       id: '2',
       type: 'igreja',
       name: 'Catedral Metropolitana',
-      image: 'https://images.unsplash.com/photo-1548867476-842c697e8378',
+      image: 'https://images.unsplash.com/photo-1577164213863-69dd2a20cda8',
       location: 'São Paulo, SP',
       rating: 5,
       reviews: 256,

@@ -1,9 +1,6 @@
-import React, { useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
-import { useDispatch, useSelector } from 'react-redux';
-import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from './lib/firebase';
-import { setUser } from './store/slices/userSlice';
+import React from 'react';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import { RootState } from './store';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
@@ -23,12 +20,14 @@ import OfflineIndicator from './components/ui/OfflineIndicator';
 import { Toast } from './components/ui/Toast';
 import AdminPanel from './components/admin/AdminPanel';
 import TempleWaitingApproval from './components/temple/TempleWaitingApproval';
+import AppointmentHistory from './components/profile/AppointmentHistory';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { currentUser } = useSelector((state: RootState) => state.user);
+  const location = useLocation();
   
   if (!currentUser) {
-    return <Navigate to="/login" />;
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   return <>{children}</>;
@@ -38,22 +37,18 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
   const { currentUser } = useSelector((state: RootState) => state.user);
   
   if (!currentUser?.isAdmin) {
-    return <Navigate to="/" />;
+    return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;
 };
 
-const App = () => {
-  const dispatch = useDispatch();
+const AppRoutes = () => {
+  const { loading } = useSelector((state: RootState) => state.user);
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      dispatch(setUser(user));
-    });
-
-    return () => unsubscribe();
-  }, [dispatch]);
+  if (loading) {
+    return <div>Carregando...</div>;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -81,6 +76,11 @@ const App = () => {
             <UserProfile />
           </ProtectedRoute>
         } />
+        <Route path="/perfil/agendamentos" element={
+          <ProtectedRoute>
+            <AppointmentHistory />
+          </ProtectedRoute>
+        } />
         <Route path="/favoritos" element={
           <ProtectedRoute>
             <FavoritesList />
@@ -96,6 +96,12 @@ const App = () => {
       <OfflineIndicator />
       <Toast />
     </div>
+  );
+};
+
+const App = () => {
+  return (
+    <AppRoutes />
   );
 };
 

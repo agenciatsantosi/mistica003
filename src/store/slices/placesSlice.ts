@@ -1,26 +1,24 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { db } from '../../lib/firebase';
-import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, serverTimestamp, query, where } from 'firebase/firestore';
 import { toast } from 'react-toastify';
 
 interface Place {
   id: string;
   type: string;
   name: string;
-  image: string;
-  location: string;
+  images: string[];
+  description: string;
+  address: string;
   latitude: number;
   longitude: number;
-  rating: number;
-  reviews: number;
-  description: string;
-  category: string;
-  hours: string;
+  rating?: number;
+  hours?: string;
   phone?: string;
-  address?: string;
-  status?: 'active' | 'pending' | 'rejected';
-  createdAt?: any;
   email?: string;
+  status: 'active' | 'pending' | 'rejected';
+  createdAt?: any;
+  updatedAt?: any;
 }
 
 interface PlacesState {
@@ -37,6 +35,62 @@ const initialState: PlacesState = {
   error: null
 };
 
+// Buscar todos os lugares ativos
+export const fetchPlaces = createAsyncThunk(
+  'places/fetchPlaces',
+  async (_, { rejectWithValue }) => {
+    try {
+      const q = query(collection(db, 'places'));
+      const querySnapshot = await getDocs(q);
+      console.log('Lugares encontrados:', querySnapshot.size); // Debug
+      
+      const places = querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        console.log('Dados do lugar:', doc.id, data); // Debug
+        return {
+          id: doc.id,
+          ...data,
+          createdAt: data.createdAt?.toDate(),
+          updatedAt: data.updatedAt?.toDate()
+        };
+      }) as Place[];
+      
+      return places;
+    } catch (error: any) {
+      console.error('Erro ao buscar lugares:', error);
+      toast.error('Erro ao carregar lugares');
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+// Buscar templos pendentes
+export const fetchPendingTemples = createAsyncThunk(
+  'places/fetchPendingTemples',
+  async (_, { rejectWithValue }) => {
+    try {
+      const q = query(
+        collection(db, 'places'),
+        where('status', '==', 'pending'),
+        where('type', '==', 'templo')
+      );
+      const querySnapshot = await getDocs(q);
+      const temples = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        createdAt: doc.data().createdAt?.toDate(),
+        updatedAt: doc.data().updatedAt?.toDate()
+      })) as Place[];
+      
+      return temples;
+    } catch (error: any) {
+      console.error('Erro ao buscar templos pendentes:', error);
+      toast.error('Erro ao carregar templos pendentes');
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
 // Adicionar novo local
 export const addPlace = createAsyncThunk(
   'places/addPlace',
@@ -44,7 +98,9 @@ export const addPlace = createAsyncThunk(
     try {
       const dataWithTimestamp = {
         ...placeData,
-        createdAt: serverTimestamp()
+        status: 'active',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
       };
 
       const docRef = await addDoc(collection(db, 'places'), dataWithTimestamp);
@@ -53,7 +109,9 @@ export const addPlace = createAsyncThunk(
       return { 
         id: docRef.id, 
         ...placeData,
-        createdAt: new Date().toISOString() 
+        status: 'active',
+        createdAt: new Date(),
+        updatedAt: new Date()
       };
     } catch (error: any) {
       console.error('Erro ao adicionar local:', error);
@@ -70,18 +128,22 @@ export const addTemple = createAsyncThunk(
     try {
       const dataWithTimestamp = {
         ...templeData,
+        type: 'templo',
         status: 'pending',
-        createdAt: serverTimestamp()
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
       };
 
-      const docRef = await addDoc(collection(db, 'pendingTemples'), dataWithTimestamp);
+      const docRef = await addDoc(collection(db, 'places'), dataWithTimestamp);
       
       toast.success('Templo cadastrado com sucesso! Aguardando aprovação.');
       return { 
         id: docRef.id, 
-        ...templeData, 
+        ...templeData,
+        type: 'templo',
         status: 'pending',
-        createdAt: new Date().toISOString() 
+        createdAt: new Date(),
+        updatedAt: new Date()
       };
     } catch (error: any) {
       console.error('Erro ao cadastrar templo:', error);
@@ -91,46 +153,13 @@ export const addTemple = createAsyncThunk(
   }
 );
 
-// Buscar templos pendentes
-export const fetchPendingTemples = createAsyncThunk(
-  'places/fetchPendingTemples',
-  async () => {
-    try {
-      const querySnapshot = await getDocs(collection(db, 'pendingTemples'));
-      return querySnapshot.docs
-        .map(doc => ({ id: doc.id, ...doc.data() })) as Place[];
-    } catch (error: any) {
-      console.error('Erro ao buscar templos pendentes:', error);
-      toast.error('Erro ao carregar templos pendentes');
-      throw error;
-    }
-  }
-);
-
 // Aprovar templo
 export const approveTemple = createAsyncThunk(
   'places/approveTemple',
-  async (templeId: string) => {
+  async (templeId: string, { rejectWithValue }) => {
     try {
-      const querySnapshot = await getDocs(collection(db, 'pendingTemples'));
-      const templeDoc = querySnapshot.docs.find(doc => doc.id === templeId);
-      
-      if (!templeDoc) {
-        throw new Error('Templo não encontrado');
-      }
-
-      const templeData = templeDoc.data();
-
-      // Adicionar à coleção principal de lugares
-      await addDoc(collection(db, 'places'), {
-        ...templeData,
-        status: 'active',
-        updatedAt: serverTimestamp()
-      });
-
-      // Atualizar status no documento original
-      const templeRef = doc(db, 'pendingTemples', templeId);
-      await updateDoc(templeRef, { 
+      const templeRef = doc(db, 'places', templeId);
+      await updateDoc(templeRef, {
         status: 'active',
         updatedAt: serverTimestamp()
       });
@@ -140,7 +169,7 @@ export const approveTemple = createAsyncThunk(
     } catch (error: any) {
       console.error('Erro ao aprovar templo:', error);
       toast.error('Erro ao aprovar templo');
-      throw error;
+      return rejectWithValue(error.message);
     }
   }
 );
@@ -148,19 +177,20 @@ export const approveTemple = createAsyncThunk(
 // Rejeitar templo
 export const rejectTemple = createAsyncThunk(
   'places/rejectTemple',
-  async (templeId: string) => {
+  async (templeId: string, { rejectWithValue }) => {
     try {
-      const templeRef = doc(db, 'pendingTemples', templeId);
-      await updateDoc(templeRef, { 
+      const templeRef = doc(db, 'places', templeId);
+      await updateDoc(templeRef, {
         status: 'rejected',
         updatedAt: serverTimestamp()
       });
+
       toast.success('Templo rejeitado com sucesso');
       return templeId;
     } catch (error: any) {
       console.error('Erro ao rejeitar templo:', error);
       toast.error('Erro ao rejeitar templo');
-      throw error;
+      return rejectWithValue(error.message);
     }
   }
 );
@@ -170,8 +200,38 @@ const placesSlice = createSlice({
   initialState,
   reducers: {},
   extraReducers: (builder) => {
+    // fetchPlaces
     builder
-      // Add Place
+      .addCase(fetchPlaces.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchPlaces.fulfilled, (state, action) => {
+        state.loading = false;
+        state.items = action.payload;
+      })
+      .addCase(fetchPlaces.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      })
+
+    // fetchPendingTemples
+    builder
+      .addCase(fetchPendingTemples.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchPendingTemples.fulfilled, (state, action) => {
+        state.loading = false;
+        state.pendingTemples = action.payload;
+      })
+      .addCase(fetchPendingTemples.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      })
+    
+    // addPlace
+    builder
       .addCase(addPlace.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -184,7 +244,9 @@ const placesSlice = createSlice({
         state.loading = false;
         state.error = action.payload as string;
       })
-      // Add Temple
+
+    // addTemple
+    builder
       .addCase(addTemple.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -197,21 +259,39 @@ const placesSlice = createSlice({
         state.loading = false;
         state.error = action.payload as string;
       })
-      // Fetch Pending Temples
-      .addCase(fetchPendingTemples.fulfilled, (state, action) => {
-        state.pendingTemples = action.payload;
+
+    // approveTemple
+    builder
+      .addCase(approveTemple.pending, (state) => {
+        state.loading = true;
+        state.error = null;
       })
-      // Approve Temple
       .addCase(approveTemple.fulfilled, (state, action) => {
+        state.loading = false;
         const temple = state.pendingTemples.find(t => t.id === action.payload);
         if (temple) {
           state.items.push({ ...temple, status: 'active' });
           state.pendingTemples = state.pendingTemples.filter(t => t.id !== action.payload);
         }
       })
-      // Reject Temple
+      .addCase(approveTemple.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      })
+
+    // rejectTemple
+    builder
+      .addCase(rejectTemple.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
       .addCase(rejectTemple.fulfilled, (state, action) => {
+        state.loading = false;
         state.pendingTemples = state.pendingTemples.filter(t => t.id !== action.payload);
+      })
+      .addCase(rejectTemple.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
       });
   }
 });

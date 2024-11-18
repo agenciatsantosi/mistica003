@@ -65,7 +65,7 @@ const AdminPanel = () => {
         {/* Sidebar */}
         <aside className="w-64 bg-white shadow-md min-h-screen">
           <div className="p-4 border-b">
-            <h1 className="text-xl font-bold text-rose-500">Místico Admin</h1>
+            <h1 className="text-xl font-bold text-rose-500">Portal da Fé - Admin</h1>
           </div>
           <nav className="p-4">
             <ul className="space-y-2">

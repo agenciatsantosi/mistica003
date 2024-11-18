@@ -88,12 +88,38 @@ export const signIn = createAsyncThunk(
       // Buscar dados do usuário
       const userRef = doc(db, 'users', result.user.uid);
       const userSnap = await getDoc(userRef);
+      
+      // Verificar se é admin
+      const isAdmin = email === 'admin@mistico.com';
+      
+      if (!userSnap.exists()) {
+        // Criar documento do usuário se não existir
+        await setDoc(userRef, {
+          displayName: result.user.displayName,
+          email: result.user.email,
+          photoURL: result.user.photoURL,
+          isAdmin,
+          visitedPlaces: [],
+          preferences: {
+            notifications: true,
+            language: 'pt',
+            theme: 'light',
+          },
+          createdAt: new Date(),
+        });
+      }
+      
       const userData = userSnap.exists() ? userSnap.data() : null;
 
-      return {
+      // Retornar usuário com flag isAdmin
+      const userWithAdmin = {
         ...result.user,
-        isAdmin: userData?.isAdmin || email === 'admin@mistico.com'
+        isAdmin: userData?.isAdmin || isAdmin
       };
+      
+      console.log('User data after login:', userWithAdmin); // Para debug
+      
+      return userWithAdmin;
     } catch (error: any) {
       toast.error('Email ou senha incorretos');
       return rejectWithValue(error.message);
@@ -218,11 +244,13 @@ const userSlice = createSlice({
       .addCase(signInWithGoogle.fulfilled, (state, action) => {
         state.loading = false;
         state.currentUser = action.payload;
+        state.error = null;
         toast.success('Login realizado com sucesso!');
       })
       .addCase(signInWithGoogle.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
+        state.currentUser = null;
       })
       // Email Sign In
       .addCase(signIn.pending, (state) => {
@@ -232,11 +260,13 @@ const userSlice = createSlice({
       .addCase(signIn.fulfilled, (state, action) => {
         state.loading = false;
         state.currentUser = action.payload;
+        state.error = null;
         toast.success('Login realizado com sucesso!');
       })
       .addCase(signIn.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
+        state.currentUser = null;
       })
       // Sign Up
       .addCase(signUp.pending, (state) => {
@@ -246,11 +276,13 @@ const userSlice = createSlice({
       .addCase(signUp.fulfilled, (state, action) => {
         state.loading = false;
         state.currentUser = action.payload;
+        state.error = null;
         toast.success('Conta criada com sucesso!');
       })
       .addCase(signUp.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
+        state.currentUser = null;
       })
       // Sign Out
       .addCase(signOut.fulfilled, (state) => {

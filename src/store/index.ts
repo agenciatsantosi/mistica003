@@ -4,6 +4,7 @@ import favoritesReducer from './slices/favoritesSlice';
 import placesReducer from './slices/placesSlice';
 import commentsReducer from './slices/commentsSlice';
 import notificationsReducer from './slices/notificationsSlice';
+import schedulingReducer from './slices/schedulingSlice';
 
 export const store = configureStore({
   reducer: {
@@ -12,6 +13,7 @@ export const store = configureStore({
     places: placesReducer,
     comments: commentsReducer,
     notifications: notificationsReducer,
+    scheduling: schedulingReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
