@@ -3,7 +3,7 @@ import { Calendar, Clock, MapPin, Users, Search, Edit2, Trash2, Plus } from 'luc
 import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
 
-const EventsManager = () => {
+export const EventsManager = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
@@ -253,5 +253,3 @@ const EventsManager = () => {
     </div>
   );
 };
-
-export default EventsManager;

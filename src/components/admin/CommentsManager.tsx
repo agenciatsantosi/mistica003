@@ -13,7 +13,7 @@ import { toast } from 'react-toastify';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-const CommentsManager = () => {
+export const CommentsManager = () => {
   const dispatch = useAppDispatch();
   const { items: comments, loading, hasMore, filters } = useAppSelector(state => state.comments);
   const currentUser = useAppSelector(state => state.user.currentUser);
@@ -216,5 +216,3 @@ const CommentsManager = () => {
     </div>
   );
 };
-
-export default CommentsManager;

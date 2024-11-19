@@ -11,15 +11,15 @@ import {
   Settings,
   Bell
 } from 'lucide-react';
-import AdminDashboard from './AdminDashboard';
-import PlacesManager from './PlacesManager';
-import UsersManager from './UsersManager';
-import EventsManager from './EventsManager';
-import CommentsManager from './CommentsManager';
-import NotificationsManager from './NotificationsManager';
-import SettingsManager from './SettingsManager';
+import { AdminDashboard } from './AdminDashboard';
+import { PlacesManager } from './PlacesManager';
+import { UsersManager } from './UsersManager';
+import { EventsManager } from './EventsManager';
+import { CommentsManager } from './CommentsManager';
+import { NotificationsManager } from './NotificationsManager';
+import { SettingsManager } from './SettingsManager';
 
-const AdminPanel = () => {
+export const AdminPanel = () => {
   const { currentUser } = useSelector((state: RootState) => state.user);
   const [activeTab, setActiveTab] = useState('dashboard');
 
@@ -96,5 +96,3 @@ const AdminPanel = () => {
     </div>
   );
 };
-
-export default AdminPanel;

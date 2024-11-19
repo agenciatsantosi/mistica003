@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Settings, Globe, Bell, Shield, Database } from 'lucide-react';
 import { Button } from '../ui/Button';
 
-const SettingsManager = () => {
+export const SettingsManager = () => {
   const [settings, setSettings] = useState({
     siteName: 'Portal da Fé',
     siteDescription: 'Plataforma de descoberta de lugares espirituais',
@@ -211,5 +211,3 @@ const SettingsManager = () => {
     </div>
   );
 };
-
-export default SettingsManager;

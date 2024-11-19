@@ -10,7 +10,7 @@ import {
   Activity
 } from 'lucide-react';
 
-const AdminDashboard = () => {
+export const AdminDashboard = () => {
   const places = useSelector((state: RootState) => state.places.items);
   const users = useSelector((state: RootState) => state.user.totalUsers || 0);
   const comments = useSelector((state: RootState) => state.comments.items);
@@ -29,74 +29,91 @@ const AdminDashboard = () => {
       change: '+5%'
     },
     {
-      label: 'Eventos Ativos',
-      value: 24,
+      label: 'Agendamentos',
+      value: '156',
       icon: <Calendar className="text-green-500" />,
       change: '+18%'
     },
     {
-      label: 'Novos Comentários',
+      label: 'Comentários',
       value: comments.length,
       icon: <MessageSquare className="text-purple-500" />,
       change: '+8%'
     }
   ];
 
+  const recentActivity = [
+    {
+      id: 1,
+      type: 'user',
+      message: 'Novo usuário registrado',
+      time: '5 minutos atrás'
+    },
+    {
+      id: 2,
+      type: 'place',
+      message: 'Novo local adicionado',
+      time: '10 minutos atrás'
+    },
+    {
+      id: 3,
+      type: 'comment',
+      message: 'Novo comentário em Igreja São José',
+      time: '15 minutos atrás'
+    }
+  ];
+
   return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold">Dashboard</h2>
+    <div className="p-6">
+      <div className="mb-8">
+        <h2 className="text-2xl font-bold text-gray-900">Dashboard</h2>
+        <p className="text-gray-500">Bem-vindo ao painel administrativo</p>
+      </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         {stats.map((stat, index) => (
-          <div key={index} className="bg-white p-6 rounded-lg shadow-md">
+          <div key={index} className="bg-white rounded-lg shadow p-6">
             <div className="flex items-center justify-between mb-4">
-              <div className="p-2 bg-gray-50 rounded-lg">
+              <div className="p-2 rounded-lg bg-gray-50">
                 {stat.icon}
               </div>
-              <span className="flex items-center text-sm text-green-600">
-                <TrendingUp size={16} className="mr-1" />
+              <span className="text-sm text-green-600 flex items-center">
+                <TrendingUp className="w-4 h-4 mr-1" />
                 {stat.change}
               </span>
             </div>
-            <h3 className="text-gray-600 text-sm">{stat.label}</h3>
-            <p className="text-2xl font-bold mt-1">{stat.value}</p>
+            <h3 className="text-2xl font-bold text-gray-900 mb-1">
+              {stat.value}
+            </h3>
+            <p className="text-gray-500">{stat.label}</p>
           </div>
         ))}
       </div>
 
-      {/* Activity Chart */}
-      <div className="bg-white p-6 rounded-lg shadow-md">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold">Atividade Recente</h3>
-          <div className="flex items-center text-gray-600">
-            <Activity size={20} className="mr-2" />
-            Últimos 30 dias
-          </div>
-        </div>
-        <div className="h-64 flex items-center justify-center text-gray-500">
-          Gráfico de atividades será implementado aqui
-        </div>
-      </div>
-
       {/* Recent Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <h3 className="text-lg font-semibold mb-4">Últimos Usuários</h3>
-          <div className="space-y-4">
-            {/* Lista de usuários recentes aqui */}
-          </div>
+      <div className="bg-white rounded-lg shadow">
+        <div className="p-6 border-b border-gray-200">
+          <h3 className="text-lg font-medium text-gray-900">
+            Atividade Recente
+          </h3>
         </div>
-
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <h3 className="text-lg font-semibold mb-4">Comentários Recentes</h3>
-          <div className="space-y-4">
-            {/* Lista de comentários recentes aqui */}
-          </div>
+        <div className="divide-y divide-gray-200">
+          {recentActivity.map((activity) => (
+            <div key={activity.id} className="p-6 flex items-center">
+              <div className="mr-4">
+                <Activity className="w-5 h-5 text-gray-400" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-900">
+                  {activity.message}
+                </p>
+                <p className="text-sm text-gray-500">{activity.time}</p>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>
   );
 };
-
-export default AdminDashboard;

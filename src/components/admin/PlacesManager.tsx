@@ -20,9 +20,8 @@ import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
 import { LazyImage } from '../ui/Image';
 import { toast } from 'react-toastify';
-import { seedTestData, updateExistingPlaces } from '../../lib/firebase';
 
-const PlacesManager = () => {
+export const PlacesManager = () => {
   const dispatch = useDispatch();
   const { items: places, pendingTemples, loading } = useSelector((state: RootState) => state.places);
   const { currentUser } = useSelector((state: RootState) => state.user);
@@ -199,13 +198,10 @@ const PlacesManager = () => {
           {process.env.NODE_ENV === 'development' && (
             <>
               <Button 
-                onClick={updateExistingPlaces} 
+                onClick={handleAddTestPlace} 
                 variant="secondary"
                 icon={<RefreshCw size={20} />}
               >
-                Atualizar Lugares Existentes
-              </Button>
-              <Button onClick={seedTestData} variant="secondary">
                 Adicionar Dados de Teste
               </Button>
             </>
@@ -527,5 +523,3 @@ const PlacesManager = () => {
     </div>
   );
 };
-
-export default PlacesManager;
